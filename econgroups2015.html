@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+#wrapper{
+  float: left;
+}
+
+#legend{
+  position: absolute;
+  left: 708px;
+  top: 448px;
+}
+
+#option{
+  position:absolute;
+  left: 10%;
+  top: 15px;
+  border-color: grey;
+}
+
+#background{
+  width: 850px;
+  background-color:#DDD2CC;
+
+}
+
+#background2{
+  width: 849px;
+  border: 1px solid #DDD2CC;
+  position:absolute;
+}
+
+input[type="button"]{
+  width: 100px;
+  background: white;
+  padding-left: 2px;
+}
+
+h2{
+  text-align:center;
+}
+
+.counties {
+  fill: none;
+}
+
+.states {
+  fill: none;
+  stroke: #fff;
+  stroke-linejoin: round;
+}
+
+text {
+    font-family: arial;
+    font-size: 11px;
+}
+
+.activeItem {
+    border: none;
+    outline-color: #DB4C40;
+    box-shadow: 0px 0px 1px #194D56;
+    transition: color 0s 9999999s;
+}
+
+.d3-tip {
+  line-height: 1;
+  font-size: 10.5px;
+  padding: 3px;
+  background: rgba(17, 2, 28, 0.8);
+  color: #fff;
+  border-radius: 0px;
+  font-family: arial;
+  border: 1px solid darkblue;
+}
+
+.x.axis,
+.y.axis{
+  fill:none;
+  stroke: none;
+}
+
+</style>
+</head>
+<body>
+  <div id="wrapper"></div>
+    <div id = "legend"
+        style = "border:1px solid #E8E0DC;" ></div>
+    <div id = "background" style= "position: absolute;height:40px;"></div>
+    <div id = "buttons">
+      <div id="option">
+                    
+          <input name="updateButton"
+                      type="button"
+                      style = "font-size:12px; color: darkblue;"
+                      value="Hillary Clinton"
+                      onclick="candidate(this, this.value)" />
+
+          <input name="updateButton2"
+                       type="button"
+                       style = "font-size:12px; color: darkblue;"
+                      value="Bernie Sanders"
+                      onclick="candidate(this, this.value)" />
+                      
+            
+          <input name="refresh"
+                      type="button"
+                      style = "font-size:12px;color: darkblue;"
+                      value= "Remaining Dem"
+                      onclick="candidate(this, this.value)" />            
+          
+          <input name="refresh"
+                      type="button"
+                      style = "width: 20px; height: 20px; color: black; font-size:12px; padding-left: 3px; padding-top: 0px;"
+                      value= "&#10687"
+                      onclick="candidate(this, this.value)" />
+                      
+          <input name="updateButton3"
+                       type="button"
+                       style = "font-size:12px;color: darkred;"
+                      value="Donald Trump"
+                      onclick="candidate(this, this.value)" />
+                      
+                      
+            <input name="updateButton4"
+                         type="button"
+                         style = "font-size:12px;color: darkred;"
+                        value="Ted Cruz"
+                        onclick="candidate(this, this.value)" />
+                        
+            <input name="refresh"
+                        type="button"
+                      style = "font-size:12px;color: darkred;"
+                        value= "Remaining Rep"
+                        onclick="candidate(this, this.value)" />
+      
+    
+    
+    </div>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+<script>
+
+var width = 856,
+    height = 550;
+
+var colors = [ "#F9EFED", "#8DC481", "#9B958B", "#65C6BE", "#DB6D78","#E5B675"];     
+    //d3.select('#wrapper').append('h2').text("US Econ Sectors 2015");
+
+var getcolor = d3.map();
+var getemp = d3.map();
+var getname = d3.map();
+var getstate = d3.map();
+var prevItem = null;  
+var numformat = d3.format(".02p")
+var lgdcolor = "#DDD2CC";
+
+var projection = d3.geo.albersUsa()
+    .scale(1100)
+    .translate([(width / 2)-30, (height / 2)-10]);
+
+var path = d3.geo.path()
+    .projection(projection);
+    
+var margin = {
+    top: 75,
+    left: 75,
+    right: 30,
+    bottom: 0
+};
+
+var barchart = d3.select("#wrapper").append("svg")
+    .attr("width", 855)
+    .attr("height", 170 - margin.top - margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        
+var svg = d3.select("#wrapper").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+    
+var lgd = d3.select("#legend").append("svg")
+    .attr("width", 135)
+    .attr("height", 155);
+    
+var xScale = d3.scale.linear()
+        .range([0, 700]);
+
+var yScale = d3.scale.ordinal()
+      .rangeRoundBands([0, 100]);
+
+var xAxis = d3.svg.axis()
+            .orient("top")
+            .scale(xScale);
+
+var yAxis = d3.svg.axis()
+           .orient("left")
+           .scale(yScale);            
+
+var data =  [];  
+var bardata = [];
+
+
+queue()
+    .defer(d3.json, "us.json")
+    .defer(d3.csv, "unemp2.csv", function(d) {
+      data.push(d);
+      getname.set(+d.FIPSTXT, d.County);
+      getcolor.set(+d.FIPSTXT, +d.econ_15);
+      getemp.set(+d.FIPSTXT, d.lowemp_15);
+      getstate.set(+d.FIPSTXT, d.State);
+      })
+    .await(ready);
+
+
+
+function ready(error, us) {
+  
+  bardata = d3.nest().key(function(d){
+      return d.econ_15; })
+      .rollup(function(leaves){
+        return leaves.length; })
+      .entries(data);
+      
+  var count = 0;    
+  for(var b = 0; b<bardata.length; b++){
+    bardata[b].count = count;
+    count += bardata[b].values;
+  };
+      
+    console.log(bardata);
+  
+    barchart.append("g")
+    .attr("class", "x axis")
+    .call(xAxis);
+    
+    yScale.domain([7]);
+    xScale.domain([0,(bardata[5].count + bardata[5].values)]);
+    
+    barchart.append("g")
+        .attr("class", "y axis")
+        .call(yAxis);
+    
+    var g = barchart.selectAll("rect")
+    .data(bardata)
+    .enter().append("g");
+    
+    g.append("rect")
+    .attr('x', function (d) { return xScale(d.count);})
+    .attr('y', yScale(7))
+    .attr('height', 18)
+    .attr('width', function (d) {return xScale(d.values);})
+    .style("fill", function(d){return colors[d.key];})
+    .style("stroke", "#E8E0DC");
+    
+    g.append("text")
+    .attr("class", "txt")
+    .attr('x', function (d) { return xScale(d.count)+2;})
+    .attr('y', yScale(7) + 13)
+    .text(function(d){ return numformat(d.values/bardata[5].count);})
+    .style("fill", "black")
+    .style("font-family", "arial")
+    .style("font-size", "9px");
+    
+
+  // creating tip for hover
+  var tip = d3.tip()
+    .attr('class', 'd3-tip')
+    .offset([-5,20])
+    .html(function(d) { return (getname.get(d.id) + ", " + getstate.get(d.id)); });
+  
+  //appending map colored by economic sector   
+   svg.append("g")
+      .attr("class", "counties")
+    .selectAll("path")
+      .data(topojson.feature(us, us.objects.counties).features)
+    .enter().append("path")
+      .attr("class", "county")
+      .attr("d", path)
+      .style("fill", function(d){ return colors[getcolor.get(d.id)]})
+      .style("stroke", function(d){
+          if(getemp.get(d.id) == '1'){ return "black";}
+          else { return "none";};
+        })
+    .on('mouseover', function(d){
+     d3.select(this).style("stroke-width", "2px");
+      tip.show(d);
+    })
+    .on('mouseout', function(d){
+      d3.select(this).style("stroke-width", "1px");
+       tip.hide(d);
+    });;
+
+  // calling tip  
+  svg.call(tip);
+  
+  // creating state lines
+  svg.append("path")
+      .datum(topojson.mesh(us, us.objects.states, function(a, b) {return true; }))
+      .attr("class", "states")
+      .attr("d", path)
+      .style("stroke", "grey");
+
+  // legend
+  var legend = lgd.append("g")
+      .attr("class","legend")
+      .attr("x", 0)
+      .attr("y", 10)
+      .attr("height", 120)
+      .attr("width", 20);
+
+    var lgdy = 21;    
+    var lgdx = 5;
+
+    for(i=0; i <= 5; i++){
+    legend.append("rect")
+        .attr("x", lgdx+10)
+        .attr("y", lgdy + 12 + i*15)
+        .attr("width", 10)
+        .attr("height", 10)
+        .style("fill", colors[i])
+        .style("stroke", "#E8E0DC");
+      };
+      
+    legend.append("rect")
+        .attr("x", lgdx+10)
+        .attr("y", lgdy+ 115)
+        .attr("width", 10)
+        .attr("height", 10)
+        .style("stroke", "black")
+        .style("fill", "white");
+        
+        legend.append("rect")
+        .attr("x1", 0)
+        .attr("y1", 0)
+        .attr("width", 136)
+        .attr("height", lgdy+2)
+        .style("fill", lgdcolor);
+        
+        legend.append("text")
+        .attr("x", lgdx+0)
+        .attr("y", lgdy-5)
+        .text("Primary Economic Sector");
+        
+        legend.append("text")
+        .attr("x", lgdx+22)
+        .attr("y", lgdy+ 21)
+        .text("No Primary Sector");
+        
+        legend.append("text")
+        .attr("x", lgdx+22)
+        .attr("y", lgdy+ 36)
+        .text("Farming");
+    
+        legend.append("text")
+        .attr("x", lgdx+22)
+        .attr("y", lgdy+ 51)
+        .text("Mining");
+        
+        legend.append("text")
+        .attr("x", lgdx+22)
+        .attr("y", lgdy+ 66)
+        .text("Manufacturing");
+    
+        legend.append("text")
+        .attr("x", lgdx+22)
+        .attr("y", lgdy+81)
+        .text("Government");
+        
+        legend.append("text")
+        .attr("x", lgdx+22)
+        .attr("y", lgdy+96)
+        .text("Recreation");
+        
+        legend.append("text")
+        .attr("x", lgdx+22)
+        .attr("y", lgdy+120)
+        .text("Underemployment");
+        
+        legend.append("line")
+        .attr("x1", lgdx+22)
+        .attr("y1", lgdy + 104)
+        .attr("x2", lgdx+110)
+        .attr("y2", lgdy + 104)
+        .style("stroke", lgdcolor);
+        
+        legend.append("text")
+        .attr("x", lgdx+22)
+        .attr("y", lgdy+131)
+        .text("(<65% Employed)");
+        
+};
+
+
+
+function candidate(t, canname){
+  
+  if(prevItem != null){
+      prevItem.className = prevItem.className.replace(" activeItem", "");}
+   t.className += " activeItem";
+   prevItem = t;
+  
+  var votes = d3.map(data, function(d){ return +d.FIPSTXT;} );
+  
+  if(canname == '\u29BF'){
+    
+        d3.selectAll("path.county")
+        .transition()
+        .delay(100)
+        .duration(0)
+           .style("fill", function(d){
+             return colors[getcolor.get(d.id)]})
+           .style("stroke", function(d){
+               if(getemp.get(d.id) == '1'){
+                 return "black"}
+               else { return "none"};
+             })
+      
+         bardata = d3.nest().key(function(d){
+             return d.econ_15; })
+             .rollup(function(leaves){
+               return leaves.length; })
+             .entries(data);
+             
+         count = 0;    
+         
+         for(var b = 0; b<bardata.length; b++){
+           bardata[b].count = count;
+           count += bardata[b].values;
+         };
+          
+         xScale.domain([0,(bardata[5].count+bardata[5].values)]);
+           
+          
+          d3.selectAll("rect")
+          .data(bardata)
+          .transition()
+          .delay(100)
+          .duration(150)
+          .attr('x', function (d) { return xScale(d.count);})
+          .attr('width', function (d) {return xScale(d.values);});
+          
+          d3.selectAll(".txt")
+          .data(bardata)
+          .transition()
+          .delay(100)
+          .duration(150)
+          .attr('x', function (d) { return xScale(d.count)+2;})
+          .text(function(d){ return numformat(d.values/bardata[5].count);}); 
+      
+          
+    } 
+    else if(canname == "Remaining Dem"){
+    
+      bardata2 = d3.nest().key(function(d){
+          return d["Hillary Clinton"]; })
+          .key(function(d){return d.econ_15;})
+          .rollup(function(leaves){
+            return leaves.length; })
+          .entries(data); 
+       
+      bardata = bardata2.filter( function(d){
+        if(d.key == "NO"){
+          return d;}; });  
+       
+        count = 0;    
+        for(var b = 0; b<bardata[0].values.length; b++){
+          bardata[0].values[b].count = count;
+          count += bardata[0].values[b].values;
+        };
+      
+        d3.selectAll("path.county")
+        .transition()
+        .delay(100)
+        .duration(0)
+        .style("fill", function(d) {
+            if ( typeof(votes.get(d.id)) !== 'undefined' && votes.get(d.id)["Bernie Sanders"] == "NA" ){
+                return colors[getcolor.get(d.id)];
+            }
+            else{ return "none"};
+          })
+        .style("stroke", function(d){
+            if(typeof(votes.get(d.id)) !== 'undefined' && votes.get(d.id)["Bernie Sanders"] == "NA" && getemp.get(d.id) == '1'){
+              return "black"}
+            else { return "none"};
+          });
+                  
+            xScale.domain([0,(bardata[0].values[5].count+ bardata[0].values[5].values)]);
+              
+           d3.selectAll("rect")
+           .data(bardata[0].values)
+           .transition()
+           .delay(100)
+           .duration(150)
+           .attr('x', function (d) { return xScale(d.count);})
+           .attr('width', function (d) {return xScale(d.values);});
+           
+           d3.selectAll(".txt")
+           .data(bardata[0].values)
+           .transition()
+           .delay(100)
+           .duration(150)
+           .attr('x', function (d) { return xScale(d.count)+2;})
+           .text(function(d){ return numformat(d.values/bardata[0].values[5].count);}); 
+      
+    }
+    else if (canname == "Remaining Rep"){
+      
+      bardata2 = d3.nest().key(function(d){
+          return d["Donald Trump"]; })
+          .key(function(d){return d.econ_15;})
+          .rollup(function(leaves){
+            return leaves.length; })
+          .entries(data); 
+       
+      bardata = bardata2.filter( function(d){
+        if(d.key == "NO"){
+          return d;}; });  
+       
+        count = 0;    
+        for(var b = 0; b<bardata[0].values.length; b++){
+          bardata[0].values[b].count = count;
+          count += bardata[0].values[b].values;
+        };
+    
+        d3.selectAll("path.county")
+        .transition()
+        .delay(100)
+        .duration(0)
+        .style("fill", function(d) {
+            if ( typeof(votes.get(d.id)) !== 'undefined' && votes.get(d.id)["Donald Trump"] == "NA"){
+                return colors[getcolor.get(d.id)];
+            }
+            else{ return "none"};
+          })
+        .style("stroke", function(d){
+            if(typeof(votes.get(d.id)) !== 'undefined' && votes.get(d.id)["Donald Trump"] == "NA" && getemp.get(d.id) == '1'){
+              return "black"}
+            else { return "none"};
+          }); 
+            
+            xScale.domain([0,(bardata[0].values[5].count+ bardata[0].values[5].values)]);
+              
+           d3.selectAll("rect")
+           .data(bardata[0].values)
+           .transition()
+           .delay(100)
+           .duration(150)
+           .attr('x', function (d) { return xScale(d.count);})
+           .attr('width', function (d) {return xScale(d.values);});
+           
+           d3.selectAll(".txt")
+           .data(bardata[0].values)
+           .transition()
+           .delay(100)
+           .duration(150)
+           .attr('x', function (d) { return xScale(d.count)+2;})
+           .text(function(d){ return numformat(d.values/bardata[0].values[5].count);});  
+         
+      }
+    else {
+      
+      var bardata2 = d3.nest().key(function(d){
+          return d[canname]; })
+          .key(function(d){return d.econ_15;})
+          .rollup(function(leaves){
+            return leaves.length; })
+          .entries(data); 
+      
+      bardata = bardata2.filter( function(d){
+        if(d.key == canname){
+          return d;}; });  
+          
+        count = 0;    
+        for(var b = 0; b<bardata[0].values.length; b++){
+          bardata[0].values[b].count = count;
+          count += bardata[0].values[b].values;
+        };
+      
+        d3.selectAll("path.county")
+        .transition()
+        .delay(100)
+        .duration(0)
+        .style("fill", function(d) {
+            if ( typeof(votes.get(d.id)) !== 'undefined' && votes.get(d.id)[canname] == canname ){
+                return colors[getcolor.get(d.id)];
+            }
+            else{ return "none"};
+          })
+        .style("stroke", function(d){
+            if(typeof(votes.get(d.id)) !== 'undefined' && votes.get(d.id)[canname] == canname && getemp.get(d.id) == '1'){
+              return "black"}
+            else { return "none"};
+          });
+            
+      
+          xScale.domain([0,(bardata[0].values[5].count+ bardata[0].values[5].values)]);
+              
+           d3.selectAll("rect")
+           .data(bardata[0].values)
+           .transition()
+           .delay(100)
+           .duration(150)
+           .attr('x', function (d) { return xScale(d.count);})
+           .attr('width', function (d) {return xScale(d.values);});
+           
+           d3.selectAll(".txt")
+           .data(bardata[0].values)
+           .transition()
+           .delay(100)
+           .duration(150)
+           .attr('x', function (d) { return xScale(d.count)+2;})
+           .text(function(d){ return numformat(d.values/bardata[0].values[5].count);});    
+            
+      };
+    };
+
+
+
+</script>
+</body>
+</html>
